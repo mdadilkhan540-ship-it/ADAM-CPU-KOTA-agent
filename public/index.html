@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADAM · Career Point University</title>
+<style>
+  :root{--bg:#0b1020;--card:#141b34;--text:#eef1ff;--muted:#8d97c4;--accent:#5b8cff;--ok:#2ecc8f;--bad:#ff5b6e}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at top,#18214a,var(--bg));color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+  .card{width:100%;max-width:460px;background:var(--card);border-radius:20px;padding:28px;box-shadow:0 20px 60px #0008}
+  h1{margin:0;font-size:28px;letter-spacing:.5px}
+  .sub{color:var(--muted);margin:4px 0 24px}
+  .orb{width:120px;height:120px;border-radius:50%;margin:0 auto 20px;background:linear-gradient(135deg,var(--accent),#9b6bff);display:grid;place-items:center;font-size:40px;font-weight:700;transition:.3s}
+  .orb.live{animation:pulse 1.4s infinite;box-shadow:0 0 0 0 #5b8cff88}
+  @keyframes pulse{70%{box-shadow:0 0 0 28px #5b8cff00}100%{box-shadow:0 0 0 0 #5b8cff00}}
+  #status{text-align:center;color:var(--muted);margin-bottom:16px;min-height:22px}
+  button{width:100%;padding:14px;border:0;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;color:#fff;background:var(--accent)}
+  button.end{background:var(--bad)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #log{margin-top:20px;max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .msg{padding:8px 12px;border-radius:12px;font-size:14px;max-width:85%}
+  .msg.assistant{background:#222c55;align-self:flex-start}
+  .msg.user{background:var(--accent);align-self:flex-end}
+  details{margin-top:22px;color:var(--muted);font-size:14px}
+  input{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3566;background:#0e1430;color:var(--text);margin:6px 0}
+  details button{background:#2a3566;margin-top:4px}
+  #outMsg{margin-top:8px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>ADAM</h1>
+  <p class="sub">CPU Kota · attendance &amp; parent helpline · talk to me live</p>
+  <div class="orb" id="orb">A</div>
+  <div id="status">Ready</div>
+  <button id="btn">🎙️ Start Call</button>
+  <div id="log"></div>
+
+  <p style="text-align:center;margin:18px 0 0;font-size:13px"><a href="/admin.html" style="color:#8d97c4">Admin dashboard</a></p>
+</div>
+
+<script type="module">
+import Vapi from "https://esm.sh/@vapi-ai/web";
+
+const $ = id => document.getElementById(id);
+const btn = $("btn"), orb = $("orb"), statusEl = $("status"), logEl = $("log");
+let vapi, cfg, active = false;
+
+const setStatus = t => statusEl.textContent = t;
+const addMsg = (role, text) => {
+  const d = document.createElement("div");
+  d.className = "msg " + role; d.textContent = text;
+  logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+};
+
+try {
+  cfg = await (await fetch("/api/config")).json();
+  if (!cfg.publicKey || !cfg.assistantId) throw new Error("missing config");
+  vapi = new Vapi(cfg.publicKey);
+} catch {
+  setStatus("Setup incomplete: check .env (public key, assistant id)");
+  btn.disabled = true;
+}
+
+if (vapi) {
+  vapi.on("call-start", () => { active = true; btn.textContent = "⏹ End Call"; btn.className = "end"; orb.classList.add("live"); setStatus("Connected · speak now"); });
+  vapi.on("call-end",   () => { active = false; btn.textContent = "🎙️ Start Call"; btn.className = ""; btn.disabled = false; orb.classList.remove("live"); setStatus("Call ended"); });
+  vapi.on("speech-start", () => setStatus("ADAM is speaking…"));
+  vapi.on("speech-end",   () => setStatus("Listening…"));
+  vapi.on("error", e => { console.error(e); setStatus("Error: check mic permission / keys"); btn.disabled = false; });
+  vapi.on("message", m => {
+    if (m.type === "transcript" && m.transcriptType === "final") addMsg(m.role, m.transcript);
+  });
+
+  btn.onclick = () => {
+    if (active) return vapi.stop();
+    logEl.innerHTML = ""; btn.disabled = true; setStatus("Connecting…");
+    vapi.start(cfg.assistantId).finally(() => btn.disabled = false);
+  };
+}
+
+</script>
+</body>
+</html>

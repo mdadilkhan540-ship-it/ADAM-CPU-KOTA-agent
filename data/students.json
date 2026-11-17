@@ -1,0 +1,5 @@
+[
+  {"rollNumber":"CPU2026001","name":"Aarav Sharma","course":"B.Tech CSE Sem 3","parentName":"Mr. Rajesh Sharma","parentPhone":"+910000000001","attended":58,"total":80,"absentToday":false,"recentAbsences":[],"notifiedOn":""},
+  {"rollNumber":"CPU2026002","name":"Priya Meena","course":"BBA Sem 1","parentName":"Mrs. Sunita Meena","parentPhone":"+910000000002","attended":72,"total":80,"absentToday":false,"recentAbsences":[],"notifiedOn":""},
+  {"rollNumber":"CPU2026003","name":"Rohit Verma","course":"B.Com Sem 5","parentName":"Mr. Anil Verma","parentPhone":"+910000000003","attended":66,"total":80,"absentToday":false,"recentAbsences":[],"notifiedOn":""}
+]

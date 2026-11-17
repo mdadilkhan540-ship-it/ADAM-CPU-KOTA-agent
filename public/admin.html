@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADAM · CPU Kota Dashboard</title>
+<style>
+:root{--bg:#0b1020;--card:#141b34;--text:#eef1ff;--muted:#8d97c4;--accent:#5b8cff;--bad:#ff5b6e;--ok:#2ecc8f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:20px}
+.wrap{max-width:1000px;margin:auto}h1{margin:0 0 4px}.sub{color:var(--muted);margin:0 0 16px}
+.card{background:var(--card);border-radius:16px;padding:18px;margin-bottom:16px;overflow-x:auto}
+input,button,textarea{padding:9px 12px;border-radius:10px;border:1px solid #2a3566;background:#0e1430;color:var(--text);font-size:14px}
+button{background:var(--accent);border:0;font-weight:600;cursor:pointer}button.red{background:var(--bad)}button.grey{background:#2a3566}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row input{flex:1;min-width:160px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid #222c55;vertical-align:top}th{color:var(--muted)}
+.low{color:var(--bad);font-weight:700}.good{color:var(--ok);font-weight:700}.t{max-height:100px;overflow:auto;color:var(--muted);white-space:pre-wrap;min-width:200px}
+textarea{width:100%;height:90px;margin-top:8px}#msg{margin:8px 0 0;color:var(--muted)}
+</style></head><body><div class="wrap">
+<h1>ADAM · Attendance &amp; Parent Calls</h1><p class="sub">Career Point University, Kota</p>
+<div class="card row"><input id="key" type="password" placeholder="Admin key"><button id="load">Load / refresh</button></div>
+
+<div class="card"><div class="row"><h3 style="margin:0;flex:1">Students (mark absent today, then call parents)</h3>
+<button class="red" id="callAll">📞 Call parents of all absent</button></div><p id="msg"></p><table id="students"></table></div>
+
+<div class="card"><h3>Import students (paste CSV)</h3>
+<small style="color:var(--muted)">rollNumber,name,course,parentName,parentPhone,attended,total (phone like +919876543210)</small>
+<textarea id="csv" placeholder="CPU2026010,Neha Gupta,B.Sc Sem 2,Mr. Vinod Gupta,+919876543210,60,80"></textarea>
+<button id="imp" class="grey" style="margin-top:8px">Import (replaces list)</button></div>
+
+<div class="card"><h3>Absence reasons told by parents</h3><table id="reasons"></table></div>
+<div class="card"><h3>Callback requests</h3><table id="callbacks"></table></div>
+<div class="card"><h3>Parent calls placed</h3><table id="notifications"></table></div>
+<div class="card"><h3>Call summaries &amp; transcripts</h3><table id="calls"></table></div>
+</div><script>
+const $=i=>document.getElementById(i),H=()=>({"x-admin-key":$("key").value,"Content-Type":"application/json"});
+const esc=s=>String(s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const api=(p,m="GET",b)=>fetch("/api/"+p,{method:m,headers:H(),body:b?JSON.stringify(b):undefined});
+const say=t=>$("msg").textContent=t;
+async function table(id,cols){
+ const r=await api(id); if(!r.ok){$(id).innerHTML="<tr><td>Wrong admin key</td></tr>";return}
+ const d=await r.json();
+ $(id).innerHTML="<tr>"+cols.map(c=>`<th>${c}</th>`).join("")+"</tr>"+(d.length?d.map(x=>"<tr>"+cols.map(c=>{
+  const v=c==="at"?new Date(x[c]).toLocaleString():x[c];
+  return `<td>${c==="transcript"?`<div class="t">${esc(v)}</div>`:esc(v)}</td>`}).join("")+"</tr>").join(""):"<tr><td>No data yet</td></tr>");
+}
+async function students(){
+ const r=await api("students"); if(!r.ok){$("students").innerHTML="<tr><td>Wrong admin key</td></tr>";return}
+ const d=await r.json();
+ $("students").innerHTML="<tr><th>Roll</th><th>Student</th><th>Parent</th><th>Attendance</th><th>Absent today</th><th>Parent call</th></tr>"+
+ d.map(s=>`<tr><td>${esc(s.rollNumber)}</td><td>${esc(s.name)}<br><small>${esc(s.course)}</small></td><td>${esc(s.parentName)}<br><small>${esc(s.parentPhone)}</small></td>
+ <td class="${s.percent<75?"low":"good"}">${s.percent}%</td>
+ <td><input type="checkbox" ${s.absentToday?"checked":""} onchange="mark('${s.rollNumber}',this.checked)"></td>
+ <td><button onclick="callOne('${s.rollNumber}')">Call</button> ${s.notifiedOn?`<small>called ${esc(s.notifiedOn)}</small>`:""}</td></tr>`).join("");
+}
+async function loadAll(){await students();for(const [k,c] of [["reasons",["at","student","reason"]],["callbacks",["at","name","phone","topic"]],["notifications",["at","student","parent","phone"]],["calls",["at","who","summary","transcript"]]])await table(k,c)}
+window.mark=async(roll,v)=>{await api(`students/${roll}/absent`,"POST",{absent:v});students()};
+window.callOne=async roll=>{say("Calling…");const r=await api("notify/"+roll,"POST");const d=await r.json();say(r.ok?"Call started ✔":"Failed: "+d.error);loadAll()};
+$("callAll").onclick=async()=>{if(!confirm("Call parents of ALL students marked absent today?"))return;const r=await api("notify-absent","POST");const d=await r.json();say(r.ok?`Started: ${d.started} parent call(s), about 8 seconds apart.`:"Failed")};
+$("imp").onclick=async()=>{const r=await api("students/import","POST",{csv:$("csv").value});const d=await r.json();say(r.ok?`Imported ${d.imported} students`:d.error);loadAll()};
+$("load").onclick=loadAll;
+</script></body></html>
